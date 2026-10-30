@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Погода в Воркуте — онлайн</title>
+<meta name="description" content="Актуальная погода в Воркуте: температура, ветер, осадки, прогноз на 7 дней. Данные Open-Meteo.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❄️</text></svg>">
+<style>
+  :root{
+    --bg1:#0b1a2b; --bg2:#12395c; --bg3:#1d6a8c;
+    --card:rgba(255,255,255,.08);
+    --card-brd:rgba(255,255,255,.16);
+    --txt:#eaf4ff; --dim:#a9c4dd; --acc:#6fd3ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    min-height:100vh; color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:radial-gradient(1200px 700px at 15% -10%, #1d6a8c 0%, transparent 60%),
+               radial-gradient(900px 600px at 110% 10%, #2b4f8a 0%, transparent 55%),
+               linear-gradient(160deg,var(--bg1),var(--bg2) 55%,#0a1523);
+    background-attachment:fixed;
+    padding:22px 16px 60px;
+  }
+  .wrap{max-width:960px;margin:0 auto}
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:18px}
+  h1{font-size:1.6rem;margin:0;letter-spacing:.3px}
+  .sub{color:var(--dim);font-size:.9rem}
+  .card{
+    background:var(--card);border:1px solid var(--card-brd);border-radius:18px;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  .now{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+  @media(max-width:620px){ .now{grid-template-columns:1fr} }
+  .temp{font-size:4.6rem;font-weight:700;line-height:1;letter-spacing:-2px}
+  .temp small{font-size:1.6rem;font-weight:400;color:var(--dim);letter-spacing:0}
+  .cond{font-size:1.15rem;font-weight:600;display:flex;align-items:center;gap:10px}
+  .icon{font-size:2.2rem;line-height:1}
+  .meta{color:var(--dim);font-size:.9rem;margin-top:6px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:18px}
+  .stat{background:rgba(255,255,255,.06);border:1px solid var(--card-brd);border-radius:14px;padding:12px}
+  .stat b{display:block;font-size:1.05rem;margin-top:4px}
+  .stat span{color:var(--dim);font-size:.78rem;text-transform:uppercase;letter-spacing:.6px}
+  h2{font-size:1.05rem;margin:26px 0 12px;color:#cfe6fb;font-weight:600}
+  .days{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:12px}
+  .day{text-align:center;padding:14px 8px}
+  .day .d{font-size:.82rem;color:var(--dim);text-transform:capitalize}
+  .day .i{font-size:1.8rem;margin:8px 0}
+  .day .t{font-weight:700}
+  .day .t span{color:var(--dim);font-weight:400}
+  .chart{width:100%;height:170px;display:block}
+  .hours{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+  .hour{min-width:74px;text-align:center;background:rgba(255,255,255,.055);border:1px solid var(--card-brd);border-radius:14px;padding:10px 6px;font-size:.85rem}
+  .hour .i{font-size:1.4rem;margin:6px 0}
+  footer{margin-top:26px;color:var(--dim);font-size:.82rem;text-align:center;line-height:1.6}
+  a{color:var(--acc)}
+  .err{background:rgba(255,90,90,.15);border-color:rgba(255,120,120,.4)}
+  .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ade80;margin-right:7px;animation:p 1.8s infinite}
+  @keyframes p{0%,100%{opacity:1}50%{opacity:.25}}
+  .grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}
+  @media(max-width:720px){ .grid2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>❄️ Погода в Воркуте</h1>
+    <div class="sub">67.50° с.ш., 64.03° в.д. · за Полярным кругом</div>
+  </header>
+
+  <div id="alert" class="card err" style="display:none;margin-bottom:16px"></div>
+
+  <section class="card" id="nowCard">
+    <div class="now">
+      <div class="temp" id="t">—<small>°C</small></div>
+      <div>
+        <div class="cond"><span class="icon" id="icon">⏳</span><span id="cond">Загрузка…</span></div>
+        <div class="meta" id="feels">Ощущается как —</div>
+        <div class="meta"><span class="pulse"></span>обновлено: <span id="upd">—</span> (МСК)</div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>Ветер</span><b id="wind">—</b></div>
+      <div class="stat"><span>Порывы</span><b id="gust">—</b></div>
+      <div class="stat"><span>Влажность</span><b id="hum">—</b></div>
+      <div class="stat"><span>Давление</span><b id="press">—</b></div>
+      <div class="stat"><span>Осадки</span><b id="prec">—</b></div>
+      <div class="stat"><span>Облачность</span><b id="cloud">—</b></div>
+      <div class="stat"><span>Видимость</span><b id="vis">—</b></div>
+      <div class="stat"><span>Рассвет / закат</span><b id="sun" style="font-size:.92rem">—</b></div>
+    </div>
+  </section>
+
+  <div class="grid2" style="margin-top:22px">
+    <div>
+      <h2>Ближайшие 24 часа — температура</h2>
+      <div class="card"><canvas id="chart" class="chart"></canvas></div>
+    </div>
+    <div>
+      <h2>По часам</h2>
+      <div class="hours" id="hours"></div>
+    </div>
+  </div>
+
+  <h2>Прогноз на 7 дней</h2>
+  <div class="days" id="days"></div>
+
+  <footer>
+    Данные: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (бесплатный API, без ключа).<br>
+    Страница статическая, прогноз подтягивается прямо в браузере и обновляется каждые 10 минут.<br>
+    За Полярным кругом: <span id="polar">—</span>
+    <div style="margin-top:10px">
+      <button onclick="load(true)" style="cursor:pointer;background:rgba(255,255,255,.12);color:var(--txt);border:1px solid var(--card-brd);border-radius:12px;padding:8px 16px;font-size:.88rem">🔄 Обновить сейчас</button>
+    </div>
+  </footer>
+</div>
+
+<script>
+const LAT = 67.50, LON = 64.03, TZ = "Europe/Moscow";
+
+const WMO = {
+  0:["Ясно","☀️"], 1:["Преимущественно ясно","🌤️"], 2:["Переменная облачность","⛅"], 3:["Пасмурно","☁️"],
+  45:["Туман","🌫️"], 48:["Изморозь, туман","🌫️"],
+  51:["Слабая морось","🌦️"], 53:["Морось","🌦️"], 55:["Сильная морось","🌧️"],
+  56:["Ледяная морось","🌧️"], 57:["Сильная ледяная морось","🌧️"],
+  61:["Небольшой дождь","🌦️"], 63:["Дождь","🌧️"], 65:["Сильный дождь","🌧️"],
+  66:["Ледяной дождь","🌧️"], 67:["Сильный ледяной дождь","🌧️"],
+  71:["Небольшой снег","🌨️"], 73:["Снег","🌨️"], 75:["Сильный снег","❄️"], 77:["Снежная крупа","🌨️"],
+  80:["Небольшие ливни","🌦️"], 81:["Ливни","🌧️"], 82:["Сильные ливни","⛈️"],
+  85:["Снежные ливни","🌨️"], 86:["Сильные снежные ливни","❄️"],
+  95:["Гроза","⛈️"], 96:["Гроза с градом","⛈️"], 99:["Сильная гроза с градом","⛈️"]
+};
+const wmo = c => WMO[c] || ["—","❔"];
+const dirName = d => ["С","СВ","В","ЮВ","Ю","ЮЗ","З","СЗ"][Math.round(d/45)%8];
+
+function fmtHour(iso){ return iso.slice(11,16); }
+function fmtDay(iso){
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString("ru-RU",{weekday:"short",day:"numeric",month:"short"});
+}
+function polarInfo(){
+  const now = new Date();
+  const m = now.getUTCMonth()+1, d = now.getUTCDate();
+  const after = mm => (m > mm) || (m === mm && d >= 21);
+  if (after(5) && !after(7)) return "полярный день (солнце не заходит)";
+  if (after(11) && !after(1)) return "полярная ночь (солнце не восходит)";
+  return "обычная смена дня и ночи";
+}
+
+let chartData = null;
+
+async function load(manual){
+  const url = "https://api.open-meteo.com/v1/forecast"
+    + `?latitude=${LAT}&longitude=${LON}`
+    + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
+    + "&hourly=temperature_2m,weather_code,precipitation_probability"
+    + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,wind_speed_10m_max"
+    + `&timezone=${encodeURIComponent(TZ)}&forecast_days=7`;
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    render(j);
+    document.getElementById("alert").style.display = "none";
+  }catch(e){
+    const a = document.getElementById("alert");
+    a.style.display = "block";
+    a.innerHTML = "⚠️ Не удалось получить данные о погоде: " + e.message
+      + ".<br>Проверьте соединение или откройте <a href='"+url+"' target='_blank' rel='noopener'>данные напрямую</a>.";
+  }
+}
+
+function render(j){
+  const c = j.current;
+  const [txt,ico] = wmo(c.weather_code);
+  document.getElementById("t").innerHTML = Math.round(c.temperature_2m) + "<small>°C</small>";
+  document.getElementById("icon").textContent = ico;
+  document.getElementById("cond").textContent = txt;
+  document.getElementById("feels").textContent = "Ощущается как " + Math.round(c.apparent_temperature) + "°C";
+  document.getElementById("upd").textContent = c.time.slice(11,16);
+  document.getElementById("wind").textContent = Math.round(c.wind_speed_10m) + " км/ч " + dirName(c.wind_direction_10m);
+  document.getElementById("gust").textContent = Math.round(c.wind_gusts_10m) + " км/ч";
+  document.getElementById("hum").textContent = c.relative_humidity_2m + "%";
+  document.getElementById("press").textContent = Math.round(c.pressure_msl) + " гПа";
+  document.getElementById("prec").textContent = (c.precipitation||0).toFixed(1) + " мм";
+  document.getElementById("cloud").textContent = c.cloud_cover + "%";
+  document.getElementById("vis").textContent = "—";
+  document.getElementById("sun").textContent = j.daily.sunrise[0].slice(11,16) + " / " + j.daily.sunset[0].slice(11,16);
+  document.getElementById("polar").textContent = polarInfo();
+
+  // почасово
+  const hours = document.getElementById("hours");
+  hours.innerHTML = "";
+  const nowIso = c.time.slice(0,13);
+  let start = j.hourly.time.findIndex(t => t.slice(0,13) === nowIso);
+  if(start < 0) start = 0;
+  for(let i = start; i < Math.min(start + 12, j.hourly.time.length); i++){
+    const [t2,i2] = wmo(j.hourly.weather_code[i]);
+    const el = document.createElement("div");
+    el.className = "hour";
+    el.title = t2;
+    el.innerHTML = `<div>${fmtHour(j.hourly.time[i])}</div>
+      <div class="i">${i2}</div>
+      <div><b>${Math.round(j.hourly.temperature_2m[i])}°</b></div>
+      <div style="color:var(--dim);font-size:.78rem">💧${j.hourly.precipitation_probability[i] ?? 0}%</div>`;
+    hours.appendChild(el);
+  }
+
+  // график
+  chartData = {
+    labels: j.hourly.time.slice(start, start+24).map(fmtHour),
+    values: j.hourly.temperature_2m.slice(start, start+24)
+  };
+  drawChart();
+
+  // дни
+  const days = document.getElementById("days");
+  days.innerHTML = "";
+  j.daily.time.forEach((d,i) => {
+    const [txt2,ico2] = wmo(j.daily.weather_code[i]);
+    const el = document.createElement("div");
+    el.className = "card day";
+    el.title = txt2 + (j.daily.precipitation_sum[i] ? `, осадки ${j.daily.precipitation_sum[i].toFixed(1)} мм` : "");
+    el.innerHTML = `<div class="d">${i===0 ? "Сегодня" : fmtDay(d)}</div>
+      <div class="i">${ico2}</div>
+      <div class="t">${Math.round(j.daily.temperature_2m_max[i])}° <span>${Math.round(j.daily.temperature_2m_min[i])}°</span></div>
+      <div style="color:var(--dim);font-size:.78rem;margin-top:6px">💧 ${(j.daily.precipitation_sum[i]||0).toFixed(1)} мм</div>
+      <div style="color:var(--dim);font-size:.78rem">🌬️ ${Math.round(j.daily.wind_speed_10m_max[i])} км/ч</div>`;
+    days.appendChild(el);
+  });
+}
+
+function drawChart(){
+  const cv = document.getElementById("chart");
+  if(!cv || !chartData) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const v = chartData.values, pad = {l:34,r:10,t:14,b:22};
+  const min = Math.min(...v), max = Math.max(...v);
+  const span = (max-min) || 1;
+  const X = i => pad.l + i*(w-pad.l-pad.r)/(v.length-1);
+  const Y = t => pad.t + (1-(t-min)/span)*(h-pad.t-pad.b);
+
+  // сетка
+  ctx.strokeStyle = "rgba(255,255,255,.13)"; ctx.fillStyle = "#a9c4dd";
+  ctx.font = "11px -apple-system,Segoe UI,Roboto,sans-serif"; ctx.lineWidth = 1;
+  for(let k=0;k<=3;k++){
+    const t = min + span*k/3, y = Y(t);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(Math.round(t)+"°", 4, y+4);
+  }
+  // область
+  const grad = ctx.createLinearGradient(0,pad.t,0,h-pad.b);
+  grad.addColorStop(0,"rgba(111,211,255,.45)");
+  grad.addColorStop(1,"rgba(111,211,255,0)");
+  ctx.beginPath(); ctx.moveTo(X(0), Y(v[0]));
+  v.forEach((t,i)=>ctx.lineTo(X(i),Y(t)));
+  ctx.lineTo(X(v.length-1), h-pad.b); ctx.lineTo(X(0), h-pad.b); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  // линия
+  ctx.beginPath(); ctx.moveTo(X(0),Y(v[0]));
+  v.forEach((t,i)=>ctx.lineTo(X(i),Y(t)));
+  ctx.strokeStyle = "#6fd3ff"; ctx.lineWidth = 2.5; ctx.lineJoin="round"; ctx.stroke();
+  // точки + подписи часов
+  v.forEach((t,i)=>{
+    ctx.beginPath(); ctx.arc(X(i),Y(t),2.6,0,7); ctx.fillStyle="#eaf4ff"; ctx.fill();
+    if(i%4===0){ ctx.fillStyle="#a9c4dd"; ctx.fillText(chartData.labels[i], X(i)-11, h-6); }
+  });
+}
+
+window.addEventListener("resize", drawChart);
+load();
+setInterval(load, 600000);
+</script>
+</body>
+</html>
